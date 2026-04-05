@@ -89,7 +89,11 @@ app.get('/relatorio', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 criarTabelas();app.listen(PORT, () => console.log('Servidor rodando'));
-async function criarTabelas() {
+async function criarTabelas() :await pool.query(`
+  INSERT INTO usuarios (nome, email, senha, tipo)
+  VALUES ('admin', 'admin@admin.com', '123', 'admin')
+  ON CONFLICT DO NOTHING
+`); {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS usuarios (
       id SERIAL PRIMARY KEY,
