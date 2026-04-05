@@ -3,7 +3,11 @@ const app = express();
 const pool = require('./db/database');
 
 app.use(express.json());
-app.use(express.static('public'));
+app.use const path = require('path');
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
 
 // LOGIN
 app.post('/login', async (req, res) => {
