@@ -1,97 +1,120 @@
 const express = require('express');
 const app = express();
-
-const db = require('./db/database');
+const pool = require('./db/database');
 
 app.use(express.json());
 app.use(express.static('public'));
 
-// CADASTRAR FUNCIONÁRIO
-app.post('/funcionario', (req, res) => {
+// LOGIN
+app.post('/login', async (req, res) => {
+  const { email, senha } = req.body;
+
+  const result = await pool.query(
+    'SELECT * FROM usuarios WHERE email = $1 AND senha = $2',
+    [email, senha]
+  );
+
+  if (result.rows.length === 0) return res.status(401).send('Erro');
+
+  res.json(result.rows[0]);
+});
+
+// CADASTRAR USUÁRIO
+app.post('/registro', async (req, res) => {
+  const { nome, email, senha, tipo } = req.body;
+
+  await pool.query(
+    'INSERT INTO usuarios (nome, email, senha, tipo) VALUES ($1, $2, $3, $4)',
+    [nome, email, senha, tipo]
+  );
+
+  res.send('Usuário criado');
+});
+
+// FUNCIONÁRIOS
+app.post('/funcionario', async (req, res) => {
   const { nome } = req.body;
 
-  db.run(`INSERT INTO funcionarios (nome) VALUES (?)`, [nome], function(err) {
-    if (err) return res.send(err);
-    res.send('Funcionário cadastrado');
-  });
-});
-
-// LISTAR FUNCIONÁRIOS
-app.get('/funcionarios', (req, res) => {
-  db.all(`SELECT * FROM funcionarios`, [], (err, rows) => {
-    if (err) return res.send(err);
-    res.json(rows);
-  });
-});
-
-// EXCLUIR FUNCIONÁRIO
-app.delete('/funcionario/:id', (req, res) => {
-  const id = req.params.id;
-
-  db.run(`DELETE FROM funcionarios WHERE id = ?`, [id], (err) => {
-    if (err) return res.send(err);
-    res.send('Removido');
-  });
-});
-
-// REGISTRAR PONTO (entrada/saída automática)
-app.post('/ponto', (req, res) => {
-  const { funcionario_id } = req.body;
-  const agora = new Date().toISOString();
-
-  db.get(
-    `SELECT * FROM pontos WHERE funcionario_id = ? ORDER BY id DESC LIMIT 1`,
-    [funcionario_id],
-    (err, ultimo) => {
-
-      if (!ultimo || ultimo.saida) {
-        db.run(
-          `INSERT INTO pontos (funcionario_id, data, entrada)
-           VALUES (?, ?, ?)`,
-          [funcionario_id, agora, agora],
-          (err) => {
-            if (err) return res.send(err);
-            res.send("Entrada registrada");
-          }
-        );
-      } else {
-        db.run(
-          `UPDATE pontos SET saida = ? WHERE id = ?`,
-          [agora, ultimo.id],
-          (err) => {
-            if (err) return res.send(err);
-            res.send("Saída registrada");
-          }
-        );
-      }
-    }
+  await pool.query(
+    'INSERT INTO funcionarios (nome) VALUES ($1)',
+    [nome]
   );
+
+  res.send('OK');
+});
+
+app.get('/funcionarios', async (req, res) => {
+  const result = await pool.query('SELECT * FROM funcionarios');
+  res.json(result.rows);
+});
+
+// PONTO
+app.post('/ponto', async (req, res) => {
+  const { funcionario_id } = req.body;
+
+  const ultimo = await pool.query(
+    'SELECT * FROM pontos WHERE funcionario_id = $1 ORDER BY id DESC LIMIT 1',
+    [funcionario_id]
+  );
+
+  if (ultimo.rows.length === 0 || ultimo.rows[0].saida) {
+    await pool.query(
+      'INSERT INTO pontos (funcionario_id, entrada) VALUES ($1, NOW())',
+      [funcionario_id]
+    );
+    res.send('Entrada');
+  } else {
+    await pool.query(
+      'UPDATE pontos SET saida = NOW() WHERE id = $1',
+      [ultimo.rows[0].id]
+    );
+    res.send('Saída');
+  }
 });
 
 // RELATÓRIO
-app.get('/relatorio', (req, res) => {
-  db.all(`SELECT * FROM pontos`, [], (err, rows) => {
-    if (err) return res.send(err);
+app.get('/relatorio', async (req, res) => {
+  const result = await pool.query('SELECT * FROM pontos');
 
-    const resultado = rows.map(p => {
-      if (p.entrada && p.saida) {
-        const entrada = new Date(p.entrada);
-        const saida = new Date(p.saida);
-
-        let horas = (saida - entrada) / 3600000;
-
-        if (horas > 6) horas -= 1;
-
-        return { ...p, horas: horas.toFixed(2) };
-      }
-
-      return { ...p, horas: 'Em aberto' };
-    });
-
-    res.json(resultado);
+  const dados = result.rows.map(p => {
+    if (p.entrada && p.saida) {
+      const horas = (new Date(p.saida) - new Date(p.entrada)) / 3600000;
+      return { ...p, horas: horas.toFixed(2) };
+    }
+    return { ...p, horas: 'Aberto' };
   });
+
+  res.json(dados);
 });
 
-app.listen(3000, () => {
-  console.log('Servidor rodando em http://localhost:3000');
-});
+const PORT = process.env.PORT || 3000;
+criarTabelas();app.listen(PORT, () => console.log('Servidor rodando'));
+async function criarTabelas() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id SERIAL PRIMARY KEY,
+      nome TEXT,
+      email TEXT,
+      senha TEXT,
+      tipo TEXT
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS funcionarios (
+      id SERIAL PRIMARY KEY,
+      nome TEXT
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pontos (
+      id SERIAL PRIMARY KEY,
+      funcionario_id INTEGER,
+      entrada TIMESTAMP,
+      saida TIMESTAMP
+    )
+  `);
+
+  console.log("Tabelas criadas com sucesso");
+}
