@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Teste Sistema</title>
+</head>
+<body>
+
+<h1>Cadastro</h1>
+
+<input id="nome" placeholder="Nome">
+<button onclick="cadastrar()">Cadastrar</button>
+
+<h2>Lista</h2>
+<ul id="lista"></ul>
+
+<script>
+async function cadastrar() {
+  const nome = document.getElementById('nome').value;
+
+  if (!nome) {
+    alert('Digite um nome');
+    return;
+  }
+
+  await fetch('/funcionario', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome })
+  });
+
+  carregar();
+}
+
+async function carregar() {
+  const res = await fetch('/funcionarios');
+  const dados = await res.json();
+
+  const lista = document.getElementById('lista');
+  lista.innerHTML = '';
+
+  dados.forEach(f => {
+    const li = document.createElement('li');
+    li.textContent = f.id + ' - ' + f.nome;
+    lista.appendChild(li);
+  });
+}
+
+carregar();
+</script>
+
+</body>
+</html>

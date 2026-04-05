@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sistema de Ponto</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f6f8;
+      padding: 20px;
+    }
+
+    div {
+      background: white;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 8px;
+    }
+
+    input {
+      padding: 8px;
+      margin: 5px;
+    }
+
+    button {
+      padding: 8px 12px;
+      background: #28a745;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #218838;
+    }
+  </style>
+
+</head>
+<body>
+
+<div>
+  <h1>Sistema de Ponto</h1>
+</div>
+
+<div>
+  <h2>Cadastrar Funcionário</h2>
+  <input id="nome" placeholder="Nome">
+  <button onclick="cadastrar()">Cadastrar</button>
+</div>
+
+<div>
+  <h2>Funcionários</h2>
+  <ul id="lista"></ul>
+</div>
+
+<div>
+  <h2>Bater Ponto</h2>
+  <input id="funcionario_id" placeholder="ID do funcionário">
+  <button onclick="baterPonto()">Bater Ponto</button>
+</div>
+
+<div>
+  <h2>Relatório</h2>
+  <ul id="relatorio"></ul>
+</div>
+
+<script>
+async function cadastrar() {
+  const nome = document.getElementById('nome').value;
+
+  if (!nome) {
+    alert('Digite um nome');
+    return;
+  }
+
+  await fetch('/funcionario', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome })
+  });
+
+  document.getElementById('nome').value = '';
+  carregar();
+}
+
+async function carregar() {
+  const res = await fetch('/funcionarios');
+  const dados = await res.json();
+
+  const lista = document.getElementById('lista');
+  lista.innerHTML = '';
+
+  dados.forEach(f => {
+    const li = document.createElement('li');
+
+    li.innerHTML = `
+      ${f.id} - ${f.nome}
+      <button onclick="remover(${f.id})">Excluir</button>
+    `;
+
+    lista.appendChild(li);
+  });
+}
+
+async function remover(id) {
+  const confirmar = confirm('Deseja excluir?');
+  if (!confirmar) return;
+
+  await fetch('/funcionario/' + id, {
+    method: 'DELETE'
+  });
+
+  carregar();
+}
+
+async function baterPonto() {
+  const funcionario_id = document.getElementById('funcionario_id').value;
+
+  await fetch('/ponto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ funcionario_id })
+  });
+
+  alert('Entrada/saída registrada');
+  carregarRelatorio();
+}
+
+async function carregarRelatorio() {
+  const res = await fetch('/relatorio');
+  const dados = await res.json();
+
+  const lista = document.getElementById('relatorio');
+  lista.innerHTML = '';
+
+  dados.forEach(p => {
+    const li = document.createElement('li');
+    li.textContent = `Funcionário ${p.funcionario_id} - ${p.horas}`;
+    lista.appendChild(li);
+  });
+}
+
+carregar();
+carregarRelatorio();
+</script>
+
+</body>
+</html>
