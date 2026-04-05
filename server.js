@@ -121,4 +121,6 @@ async function criarTabelas() :await pool.query(`
   `);
 
   console.log("Tabelas criadas com sucesso");
-}
+}app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/login.html');
+});
